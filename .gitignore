@@ -1,0 +1,5 @@
+surf
+common.o
+libsurf-webext.o
+libsurf-webext.so
+surf.o
