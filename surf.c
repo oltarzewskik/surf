@@ -35,7 +35,7 @@
 #define LENGTH(x)               (sizeof(x) / sizeof(x[0]))
 #define CLEANMASK(mask)         (mask & (MODKEY|GDK_SHIFT_MASK))
 
-enum { AtomFind, AtomGo, AtomUri, AtomLast };
+enum { AtomFind, AtomSearch, AtomGo, AtomUri, AtomLast };
 
 enum {
 	OnDoc   = WEBKIT_HIT_TEST_RESULT_CONTEXT_DOCUMENT,
@@ -175,6 +175,7 @@ static void spawn(Client *c, const Arg *a);
 static void msgext(Client *c, char type, const Arg *a);
 static void destroyclient(Client *c);
 static void cleanup(void);
+static void updatehistory(const char *u, const char *t);
 
 /* GTK/WebKit */
 static WebKitWebView *newview(Client *c, WebKitWebView *rv);
@@ -231,6 +232,7 @@ static void togglefullscreen(Client *c, const Arg *a);
 static void togglecookiepolicy(Client *c, const Arg *a);
 static void toggleinspector(Client *c, const Arg *a);
 static void find(Client *c, const Arg *a);
+static void search(Client *c, const Arg *a);
 
 /* Buttons */
 static void clicknavigate(Client *c, const Arg *a, WebKitHitTestResult *h);
@@ -326,6 +328,7 @@ setup(void)
 
 	/* atoms */
 	atoms[AtomFind] = XInternAtom(dpy, "_SURF_FIND", False);
+	atoms[AtomSearch] = XInternAtom(dpy, "_SURF_SEARCH", False);
 	atoms[AtomGo] = XInternAtom(dpy, "_SURF_GO", False);
 	atoms[AtomUri] = XInternAtom(dpy, "_SURF_URI", False);
 
@@ -336,10 +339,11 @@ setup(void)
 	curconfig = defconfig;
 
 	/* dirs and files */
-	cookiefile = buildfile(cookiefile);
-	scriptfile = buildfile(scriptfile);
-	cachedir   = buildpath(cachedir);
-	certdir    = buildpath(certdir);
+	cookiefile  = buildfile(cookiefile);
+	historyfile = buildfile(historyfile);
+	scriptfile  = buildfile(scriptfile);
+	cachedir    = buildpath(cachedir);
+	certdir     = buildpath(certdir);
 
 	gdkkb = gdk_seat_get_keyboard(gdk_display_get_default_seat(gdpy));
 
@@ -573,6 +577,19 @@ loaduri(Client *c, const Arg *a)
 		webkit_web_view_load_uri(c->view, url);
 		updatetitle(c);
 	}
+
+	g_free(url);
+}
+
+void
+search(Client *c, const Arg *a)
+{
+	Arg arg;
+	char *url;
+
+	url = g_strdup_printf(searchurl, a->v);
+	arg.v = url;
+	loaduri(c, &arg);
 
 	g_free(url);
 }
@@ -1076,10 +1093,26 @@ cleanup(void)
 	close(pipein[0]);
 	close(pipeout[1]);
 	g_free(cookiefile);
+	g_free(historyfile);
 	g_free(scriptfile);
 	g_free(stylefile);
 	g_free(cachedir);
 	XCloseDisplay(dpy);
+}
+
+void
+updatehistory(const char *u, const char *t)
+{
+	FILE *f;
+	f = fopen(historyfile, "a+");
+
+	char b[20];
+	time_t now = time (0);
+	strftime (b, 20, "%Y-%m-%d %H:%M:%S", localtime (&now));
+	fputs(b, f);
+
+	fprintf(f, " %s %s\n", u, t);
+	fclose(f);
 }
 
 WebKitWebView *
@@ -1311,6 +1344,9 @@ processx(GdkXEvent *e, GdkEvent *event, gpointer d)
 				find(c, NULL);
 
 				return GDK_FILTER_REMOVE;
+			} else if (ev->atom == atoms[AtomSearch]) {
+				a.v = getatom(c, AtomSearch);
+				search(c, &a);
 			} else if (ev->atom == atoms[AtomGo]) {
 				a.v = getatom(c, AtomGo);
 				loaduri(c, &a);
@@ -1502,6 +1538,7 @@ loadchanged(WebKitWebView *v, WebKitLoadEvent e, Client *c)
 		c->title = uri;
 		c->https = c->insecure = 0;
 		seturiparameters(c, uri, loadtransient);
+		updatehistory(uri, c->title);
 		if (c->errorpage)
 			c->errorpage = 0;
 		else
