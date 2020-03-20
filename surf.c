@@ -1540,7 +1540,6 @@ loadchanged(WebKitWebView *v, WebKitLoadEvent e, Client *c)
 		c->title = uri;
 		c->https = c->insecure = 0;
 		seturiparameters(c, uri, loadtransient);
-		updatehistory(uri, c->title);
 		if (c->errorpage)
 			c->errorpage = 0;
 		else
@@ -1558,6 +1557,7 @@ loadchanged(WebKitWebView *v, WebKitLoadEvent e, Client *c)
 		break;
 	case WEBKIT_LOAD_FINISHED:
 		seturiparameters(c, uri, loadfinished);
+		updatehistory(uri, c->title);
 		/* Disabled until we write some WebKitWebExtension for
 		 * manipulating the DOM directly.
 		evalscript(c, "document.documentElement.style.overflow = '%s'",
