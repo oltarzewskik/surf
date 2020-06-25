@@ -588,12 +588,13 @@ search(Client *c, const Arg *a)
 {
 	Arg arg;
 	char *url;
-
 	url = g_strdup_printf(searchurl, a->v);
-	arg.v = url;
-	loaduri(c, &arg);
+	if (strcmp(url, g_strdup_printf(searchurl, "")) != 0) {
+		arg.v = url;
+		loaduri(c, &arg);
 
-	g_free(url);
+		g_free(url);
+	}
 }
 
 const char *
